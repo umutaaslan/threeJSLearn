@@ -2,6 +2,7 @@
 import "./style.css";
 import * as THREE from "three";
 import * as d3 from "d3";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 function main(){
 
@@ -59,7 +60,14 @@ function main(){
     const far = 5;
 
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    camera.position.z = 9;
+    
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = .5;
+
+    camera.position.set(0, 0, 9);
+    controls.update();
 
     const scene = new THREE.Scene();
 
@@ -77,6 +85,7 @@ function main(){
     globeGroup.add(earth)
 
     earth.position.x = 0;
+
     
    
 
@@ -110,12 +119,11 @@ function main(){
             camera.updateProjectionMatrix();
         }
 
-        globeGroup.rotation.x = time / 8;
-        globeGroup.rotation.y = time / 8;
-
         renderer.render(scene, camera);
         
         requestAnimationFrame(render);
+
+        controls.update();
     }
 
     requestAnimationFrame(render);
