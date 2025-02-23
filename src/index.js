@@ -1,19 +1,17 @@
 /* eslint-disable */ 
 import "./style.css";
 import * as THREE from "three";
-import * as d3 from "d3";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 function main(){
 
 
-    d3.json("/geo.json").then(data => {
-        data.features.forEach((feature) => {
-            const { coordinates, type } = feature.geometry; 
-            drawCountryBorders(coordinates, type);
-            console.log(feature.properties.sovereignt);
-        });
-    });
+    async function getGeoData() {
+        const dataRaw = await fetch("/geo.json");
+        const data = await dataRaw.json();
+        return data;
+    };
+    
     
     function latLngToXYZ(lat, lon, radius) {
         const phi = (90 - lat) * (Math.PI / 180);
@@ -26,23 +24,32 @@ function main(){
         return new THREE.Vector3(x, y, z);
     }
 
-    function drawCountryBorders(coordinates, type) {
-        if (type === "Polygon") {
-            coordinates = [coordinates]; // Convert single Polygon to an array (for consistency)
-        }
+    async function drawCountryBorders() {
+        const data = await getGeoData();
+
+        data.features.forEach((feature) => {
+            let { coordinates, type } = feature.geometry;
+            
+            if (type === "Polygon") {
+                coordinates = [coordinates]; // Convert single Polygon to an array (for consistency)
+            }
+        
+            coordinates.forEach((polygon) => { // Loop through each polygon (MultiPolygon)
+                polygon.forEach((ring) => { // Each ring defines the outer or inner boundary
+                    const points = ring.map(([lon, lat]) => latLngToXYZ(lat, lon, 5.42)); // Convert lat/lon
+        
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });  // White border
+                    const borderLine = new THREE.Line(lineGeometry, lineMaterial);
     
-        coordinates.forEach((polygon) => { // Loop through each polygon (MultiPolygon)
-            polygon.forEach((ring) => { // Each ring defines the outer or inner boundary
-                const points = ring.map(([lon, lat]) => latLngToXYZ(lat, lon, 5.42)); // Convert lat/lon
-    
-                const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-                const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });  // White border
-                const borderLine = new THREE.Line(lineGeometry, lineMaterial);
-    
-                globeGroup.add(borderLine);
+                    globeGroup.add(borderLine);
+                });
             });
         });
+       
     }
+    
+    drawCountryBorders();
 
     const canvas = document.querySelector("#canvas");
     const renderer = new THREE.WebGLRenderer({canvas});
@@ -63,8 +70,8 @@ function main(){
     
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = .5;
+    // controls.autoRotate = true;
+    // controls.autoRotateSpeed = .5;
 
     camera.position.set(0, 0, 9);
     controls.update();
@@ -86,9 +93,78 @@ function main(){
 
     earth.position.x = 0;
 
+    const pointer = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster();
+    
+    const onClick = e => {
+        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(e.clientY / window.innerHeight) * 2 + 1; 
+
+        raycaster.setFromCamera(pointer, camera);
+        const intersects = raycaster.intersectObject(globeGroup, true);
+
+        if (intersects.length > 0) {
+            // const { lat, lon } = getLatLngFromIntersect(intersects[0]);
+            // showCountryName(lat, lon);
+            const { lat, lon } = getLatLngFromIntersect(intersects[0]);
+            getCountryFromGeoJSON(lon, lat);
+        }
+    }
+
+    function getLatLngFromIntersect(intersect) {
+        const { x, y, z } = intersect.point;
+    
+        // Compute latitude (correct formula)
+        const lat = Math.asin(y / 5.4) * (180 / Math.PI);  // 5.4 is the sphere's radius
+    
+        // Compute longitude (remains the same)
+        const lon = Math.atan2(z, x) * (180 / Math.PI);
+    
+        return { lat, lon };
+    }
     
    
+    // showCountryName(lat, lon){
 
+    // }
+
+    function pointInsidePolygon(point, polygons) {
+        for (let polygon of polygons) { // Loop through each polygon
+            let inside = false;
+            polygon.forEach((ring) => { // Loop through each ring in the polygon
+                let j = ring.length - 1;
+                for (let i = 0; i < ring.length; i++) {
+                    const xi = ring[i][0], yi = ring[i][1];
+                    const xj = ring[j][0], yj = ring[j][1];
+    
+                    const intersect = ((yi > point[1]) !== (yj > point[1])) &&
+                        (point[0] < (xj - xi) * (point[1] - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                    j = i;
+                }
+            });
+
+            if (inside) return true; // ✅ Return true if any polygon contains the point
+        }
+        return false;
+    }
+    
+    function getCountryFromGeoJSON(lat, lon) {
+        console.log(`Clicked Coordinates: Lat ${lat}, Lon ${lon}`);
+
+        const dataP = getGeoData();
+
+        dataP.then(data => {
+            data.features.forEach(feature => {
+                // console.log(pointInsidePolygon([lat, lon], feature.geometry.coordinates))
+                if (pointInsidePolygon([lon, lat], feature.geometry.coordinates)) {
+                    console.log("Clicked Country: ", feature.properties.sovereignt);
+                }
+            });
+        })      
+    }
+
+    window.addEventListener("click", onClick);
 
 
 
