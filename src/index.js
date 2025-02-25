@@ -27,7 +27,7 @@ fetch("/geo.json", { mode: "cors" })
           .onPolygonHover((hoverD, lastHoverD) => {
             if (hoverD !== lastHoverD) {
               globe
-                .polygonAltitude((d) => (d === hoverD ? 0.08 : 0.04))
+                // .polygonAltitude((d) => (d === hoverD ? 0.08 : 0.04))
                 .polygonCapColor((d) =>
                   d === hoverD ? "steelblue" : "#ffaa00",
                 );
@@ -40,31 +40,38 @@ fetch("/geo.json", { mode: "cors" })
 
         function drawProvincesBorders() {
           const newArr = [];
+          console.log(geoPJson.features)
           for (let feature of geoPJson.features) {
             if (feature.properties.iso_a2 == "TR") {
               newArr.push(feature);
+              console.log(feature)
             }
           }
-
-          // const result = countriesArr.concat(newArr);
-
+          const result = [...countriesArr, ...newArr];
           globe.polygonsData([]);
-          globe.polygonsData(newArr);
+          globe.polygonsData(result);
           //try geometryPolygonsData
           //as last remedy, code a function by yourself that draws province borders
         }
         drawProvincesBorders();
 
+
+
+
+
         // globe.onGlobeClick(({lat, lng}, e) => {
         //     console.log(lat, lng)
         // })
 
-        // function triggerCountry(countryISO){
-        //     //handle camera focus (make it static unless focus is being losed)
+        function triggerCountry(countryISO){
+            //handle camera focus (make it static unless focus is being losed)
+            //make altitude 0 in order to let provinces to be seen
 
-        //     //show provinces
-        //     drawProvincesBorders(countryISO);
 
-        // }
+
+            //show provinces
+            // drawProvincesBorders(countryISO);
+
+        }
       });
   });
